@@ -1,60 +1,102 @@
-# ios-apollo-notes
+# ios-apollo-tr: Xiaomi Mi 10T'ye iOS 16.7 kurulum rehberi
 
-Field notes from running iOS 16.7 (iPhone X userland on patched xnu-8796) on a Xiaomi Mi 10T
-(apollo, SM8250), built on top of [aTechGeekDev/ios-apollo](https://github.com/aTechGeekDev/ios-apollo)
-through the fork [EmirCakir7/ios-apollo](https://github.com/EmirCakir7/ios-apollo).
-These are findings and open problems, not a how-to. Everything here was measured on one phone;
-treat it as a lead, not as a fact about your device.
+Xiaomi Mi 10T / 10T Pro (`apollo`, SM8250) üzerinde iOS 16.7 çalıştıran
+[aTechGeekDev/ios-apollo](https://github.com/aTechGeekDev/ios-apollo) projesinin Türkçe kurulum rehberi.
+Yamalar ve araçlar [EmirCakir7/ios-apollo](https://github.com/EmirCakir7/ios-apollo) çatalındadır
+(upstream'in üstüne bizim eklediklerimiz: boşta modu, gerçek pil yüzdesi, şarj hızı, video düzeltmeleri,
+kamera yoklaması). Bu depoda kod yok, yalnızca rehber ve notlar var.
 
-## Idle / power saving (works)
-- Patch 0197 `apollo_idle=1` lowers the polling that kept every core 40-70 % busy with the screen off.
-- Patch 0198 adds DDR vote hysteresis: raise after 3 busy samples, lower after 10 quiet ones.
-- Real battery state of charge comes from the fuel gauge (`sweetbattery_fg=1`); charging limit `apollo_chg=30` (about 12 W).
-- Not yet measured: an overnight battery test with the screen off.
+> [!WARNING]
+> Bu bir deneme projesidir, günlük kullanım telefonu değildir. Telefondaki Android verisi (`userdata`) silinir.
+> Bootloader, recovery, modem ve `persist` bölümlerine dokunulmaz, ama **yedeği almadan başlamayın**.
+> Acil çağrılar çalışmaz, SIM ile arama yoktur. Her şey kendi sorumluluğunuzdadır.
 
-## Weather shows "no data" (not fixable here)
-Weather asks the FairPlay daemon for a hardware signature (`AMSFairPlayGetHardwareInfo`, "Mescal Failed").
-That is a device-bound attestation. With `fairplayd.H2` disabled the call fails at once; with it enabled it
-exits at launch and launchd respawns it forever. We do not emulate it.
+## Telefonda ne çalışıyor
 
-## Siri fails immediately
-Speech assets are missing: Trial / MobileAsset (error 1601) and
-`/System/Library/Assistant/SignalProcessingPlugins`. Microphone and speakers work.
+| Çalışıyor | Çalışmıyor / eksik |
+| --- | --- |
+| Açılış, ekran, dokunmatik, GPU ile çizilen arayüz | Arama, SMS, mobil veri (modem yok) |
+| Wi-Fi, Bluetooth | Otomatik parlaklık, hareket sensörleri |
+| Ses, mikrofon, titreşim, el feneri | Kamera (kimlik okuma çalışması sürüyor) |
+| Gerçek pil yüzdesi, şarj, boşta (idle) güç tasarrufu | Apple Kimliği / iCloud, Siri, Hava Durumu verisi |
+| Ayarlar, Safari, Fotoğraflar, Notlar gibi sistem uygulamaları | Sesli Notlar'da kayıttan sonra ana ekrana dönememe (açık hata) |
 
-## Voice Memos / "cannot return to the home screen" after a recording (open)
-UIKit's system-gesture gate waits for a `systemGestureStateChange` HID event from backboardd. After a
-recording ends VoiceMemos logs "System gesture gate timed out" (27 times, only this app). Root cause unknown.
-The "Unbalanced calls to begin/end appearance transitions for SBSwitcherViewController" line is benign.
-`apollo_syslog=1` (patch 0201) mirrors the os_log of the relevant daemons into the kernel log for debugging.
+Ayrıntılı bulgular için [NOTLAR.md](NOTLAR.md).
 
-## Battery Health screen (patch 0200, untested)
-`sweetbattery_health=1` supplies a placeholder serial and capacities so Settings > Battery > Battery Health
-has data. Off by default.
+## Nasıl açılıyor
 
-## Sensors (planned)
-Auto-brightness needs an ALS; patch 0199 adds diagnostics. On the Mi 10T the sensors sit on the SLPI
-(not the ADSP as on the Pixel 5 port), so the Pixel 5 approach (FastRPC + QMI SNS) needs a different
-remoteproc, GLINK edge and QRTR node. Estimated 2-3 weeks of work.
+```
+Xiaomi bootloader (kilidi açık)
+  └─ fastboot boot shim-boot.img        geçici: boot bölümüne yazmaz
+     └─ shim → XNU çekirdeği + sürücüler (UFS, ekran, dokunmatik, GPU, Wi-Fi, BT, ses)
+        └─ iOS kökü (HFS+), userdata içinde
+           └─ launchd → daemon'lar → backboardd + SpringBoard → uygulamalar
+```
 
-## Camera (early bring-up)
-- Patch 0202 `apollo_cam=1`: opt-in, fully undone camera clock / GDSC / CCI probe. It powers no sensor
-  and talks to no I2C slave. Not yet booted.
-- Prior art: Galaxy Note FE / S7 ports (front camera preview only, RAW10 through a userland capture device in
-  mediaserverd, CPU debayer, about 15 fps), S9 ports (HakiOS camera drivers). A Redmi/Xiaomi popsicle port
-  documents the camera at 0 %. No public Snapdragon iOS camera pipeline was found.
-- iOS 16 traps seen elsewhere: IOSurface plane bytes-per-row at +0x10 (fixed here by patch 0192),
-  `DisplayPipePlaneBaseAlignment` must be a dictionary, `BWAudioSourceNode _generateSamples` zero-fills
-  about 820 MB and gets jetsam-killed.
+- Çekirdek günlüğü seri porta gitmez; `userdata` sonundaki 4 MiB'lık alana yazılır ve recovery'den okunur.
+- Yeni bir kökün **ilk açılışı** iOS'un veri taşımasını yapar (bir saat veya daha uzun). Sonraki açılışlar yaklaşık bir dakika.
 
-## Apps
-Apps can be packed into the boot image (`tools/app-pack.sh`, limit 64 files / 48 MiB). App Store apps are
-FairPlay-encrypted, so they need decrypted IPAs. TrollStore does not support 16.7.x.
+## Gerekenler
 
-## Cellular / calls (long term)
-Prior art on a Pixel 5 port: fake baseband in the kernel, a QMUX/QMI router, voice over the ADSP. VoLTE/IMS
-is not documented anywhere we found, and emergency calls must not be promised. Months of work.
+| | |
+| --- | --- |
+| Telefon | Mi 10T / 10T Pro (`apollo`), **bootloader kilidi açık** |
+| Bilgisayar | Linux (Windows'ta WSL): `adb`, `fastboot`, `python3`, `aarch64-linux-gnu-gcc`, `mkbootimg`, GitHub CLI (`gh`) |
+| GitHub hesabı | Çekirdek ve iOS programları GitHub Actions macOS koşucularında derlenir |
+| Recovery | `adb` destekleyen bir recovery (OrangeFox çalışıyor), geçici açılır: `fastboot boot recovery.img` |
 
-## Practical notes
-- Forks get their GitHub Actions disabled by GitHub; re-enable them on the Actions tab.
-- Boot images are flashed with `fastboot boot` (temporary) or `fastboot flash boot` (permanent, keep a backup).
-- Device dumps, firmware, logs and serial/IMEI data are deliberately not published.
+> [!NOTE]
+> GitHub, çatallanmış depolarda Actions'ı kapatır. Actions sekmesinde yeşil
+> "I understand my workflows, go ahead and re-enable them" düğmesine basmanız gerekir.
+> Hesabınızda 2FA da açık olmalı.
+
+## Adım adım
+
+Komutların tamamı ve seçenekler upstream README'sindedir. Burada sıra ve dikkat edilecek yerler var.
+
+1. **Yedek:** Geçici recovery'den en az `persist`, `modemst1`, `modemst2`, `fsg`, `fsc`, `boot`, `dtbo`, `vbmeta`
+   bölümlerini çekin ve git'e koymayın (IMEI ve kalibrasyon içerirler). Sonra stok boot imajından cihaz ağacını çıkarın:
+   `python3 tools/unpack_bootv2.py backup/boot.img dtb/boot_unpacked`
+2. **Çekirdek ve iOS programları:** Depoyu çatallayın, Actions'ı açın,
+   `gh workflow run xnu.yml` (çekirdek), `userland.yml`, `audio.yml`, `bt.yml` çalıştırın, çıktıları
+   `gh run download` ile indirin. Önce `python3 tools/validate-repo.py` ile yama dizisini kontrol edin.
+3. **iOS kökü:** `tools/build-ios-root.sh` iPhone X IPSW'sinden kökü kurar ve sorarak `userdata`'ya yazar.
+4. **Yazılımlar (firmware):** Xiaomi/Qualcomm'dan gelir, git'e konmaz. Her dosya ve getiren araç upstream README'sindeki
+   "Firmware" bölümünde.
+5. **Açılış imajı:** `tools/mkadt.py` ile cihaz ağacı, `tools/mkpayload.py` ile yük, `shim/build.sh` ile imaj.
+   `--files-from tools/root-files/…` listeleriyle kök dosyalarını ekleyin. En fazla 64 dosya ve 48 MiB taşınır.
+   Geçici deneme: `fastboot boot shim/out/shim-boot.img`.
+6. **Günlük okuma:** `fastboot boot recovery.img && adb wait-for-recovery`, sonra `tools/sweet-log-pull.sh logs/boot.txt`.
+
+### Bizim önerdiğimiz ayarlar (kalıcı imaj için)
+
+- `apollo_idle=1`: ekran kapalıyken yoklamayı azaltır, pil ömrünü uzatır.
+- `sweetbattery_fg=1`: gerçek pil yüzdesi. `apollo_chg=30`: yaklaşık 12 W şarj.
+- Kök listesi olarak `quiet-on.txt` yerine `tools/root-files/fp-wifip2p-off.txt`.
+- `tools/root-files/aegir-off.txt`: Metal olmadığı için çöken astronomi duvar kağıdı eklentisini kapatır.
+- `apollo_syslog` ve `apollo_cam` yalnızca hata ayıklama içindir, kalıcı imajda kapalı olsun.
+
+### Kalıcı yazma (isteğe bağlı)
+
+Önce geçici (`fastboot boot`) imajın açıldığını ve ana ekranın geldiğini doğrulayın. Sonra stok `boot.img` yedeğiniz
+elinizdeyken:
+
+```sh
+fastboot flash boot shim-boot-kalici.img
+```
+
+Telefonun tek boot bölümü vardır. Geri dönmek için aynı komutla stok `boot.img`'i yazın. Android'e dönmek için `userdata`'yı da
+sıfırlamanız gerekebilir.
+
+## Bilinen sorunlar
+
+- **Hava Durumu "veri yok":** FairPlay cihaz imzası gerektirir, taklit edilmez.
+- **Siri:** konuşma varlıkları (Trial/MobileAsset) eksik.
+- **Sesli Notlar:** kayıt bitince ana ekrana dönülemiyor (UIKit sistem hareketi kapısı zaman aşımı), neden bilinmiyor.
+- **Uygulama kurma:** App Store uygulamaları FairPlay ile şifreli, çözülmüş IPA gerekir. TrollStore 16.7.x'te yok.
+
+## Kaynaklar ve lisans
+
+[aTechGeekDev/ios-apollo](https://github.com/aTechGeekDev/ios-apollo) (asıl proje, lisansı orada),
+[EmirCakir7/ios-apollo](https://github.com/EmirCakir7/ios-apollo) (yamalar ve araçlar). Apple'a ait hiçbir dosya burada
+yoktur. Yazılımlar ve IPSW kendi kaynaklarından indirilir.
