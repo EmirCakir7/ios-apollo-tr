@@ -95,8 +95,17 @@ sıfırlamanız gerekebilir.
 - **Sesli Notlar:** kayıt bitince ana ekrana dönülemiyor (UIKit sistem hareketi kapısı zaman aşımı), neden bilinmiyor.
 - **Uygulama kurma:** App Store uygulamaları FairPlay ile şifreli, çözülmüş IPA gerekir. TrollStore 16.7.x'te yok.
 
-## Kaynaklar ve lisans
+## Atıflar ve lisans
 
-[aTechGeekDev/ios-apollo](https://github.com/aTechGeekDev/ios-apollo) (asıl proje, lisansı orada),
-[EmirCakir7/ios-apollo](https://github.com/EmirCakir7/ios-apollo) (yamalar ve araçlar). Apple'a ait hiçbir dosya burada
-yoktur. Yazılımlar ve IPSW kendi kaynaklarından indirilir.
+Bu rehber kendi başına bir proje değildir; aşağıdaki çalışmalara dayanır. Hepsinin emeği kendi sahiplerinindir.
+
+- **[aTechGeekDev/ios-apollo](https://github.com/aTechGeekDev/ios-apollo):** asıl proje (Mi 10T portu). Rehberin adımları onun README'sinden özetlenmiştir; lisansı ve kredileri orada.
+- **[EmirCakir7/ios-apollo](https://github.com/EmirCakir7/ios-apollo):** yukarıdakinin çatalı; bizim yamalarımız (0197-0202) ve araç değişiklikleri.
+- **[hakios-apollo](https://github.com/enesuzun2002/hakios-apollo):** Mi 10T'nin ses, mikrofon, titreşim ve arka ışık sürücüleri, ses eklentisi.
+- **[HackiOS](https://github.com/oosexgang/hackios-xnu-kernel):** Mesa ve CoreAnimation yaklaşımı, Wi-Fi katmanı; [Xiaomi Mi 10 portu](https://github.com/JopangJovan/hackios-xnu-kernel-umi): QCA6390 açılışı.
+- **ios-spes ve ios-sailfish:** parlaklık servisi tasarımı.
+- **Araçlar:** [blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build), [ipsw](https://github.com/blacktop/ipsw), [Mesa](https://mesa3d.org), [OrangeFox Recovery](https://orangefox.download). Apple'ın açık kaynak sürümleri (xnu vb.).
+- **Kamera araştırmasında okuduğumuz örnekler:** [egemengunel/ios-a5xelte](https://github.com/egemengunel/ios-a5xelte) (Note FE), [Leek13rl45/ios-a5xelte](https://github.com/Leek13rl45/ios-a5xelte) (S7), [danstronics/ios-s9plus-exynos](https://github.com/danstronics/ios-s9plus-exynos), [Scion-Project/hakios-starlte](https://github.com/Scion-Project/hakios-starlte), [OctoDevStudios/ios-popsicle](https://github.com/OctoDevStudios/ios-popsicle), [lx200332/popsicle-ios-port](https://github.com/lx200332/popsicle-ios-port). Bunlardan kod kopyalanmadı, yalnızca yöntemleri okunup not edildi.
+- **Yapay zekâ yardımı:** metinler ve yamaların bir kısmı Claude (Anthropic) ile hazırlandı; her şey telefonda denenmeden doğru sayılmamalıdır.
+
+iOS ve Apple dosyaları Apple'a aittir, burada dağıtılmaz. Bu rehberin metni MIT lisanslıdır; kod için ilgili depoların lisansları geçerlidir.
